@@ -22,26 +22,29 @@ import androidx.activity.compose.setContent
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.ExperimentalAnimationApi
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.core.tween
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.Button
+import androidx.compose.material.CircularProgressIndicator
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.OutlinedTextField
 import androidx.compose.material.Surface
 import androidx.compose.material.Text
-import androidx.compose.material.Button
-import androidx.compose.material.CircularProgressIndicator
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
@@ -65,14 +68,14 @@ class MainActivity : AppCompatActivity() {
 }
 
 class TimerViewModel : ViewModel() {
-    val timerDisplayProgress =  MutableLiveData("")
+    val timerDisplayProgress = MutableLiveData("")
     val timerProgress = MutableLiveData(1.0)
     val isRunning = MutableLiveData(false)
     var timer: CountDownTimer? = null
 
-    fun startTimer(timerTimeInMillis: Long){
+    fun startTimer(timerTimeInMillis: Long) {
         isRunning.value = true
-        timer = object: CountDownTimer(timerTimeInMillis, 1000){
+        timer = object : CountDownTimer(timerTimeInMillis, 1000) {
             override fun onTick(millisUntilFinished: Long) {
                 val display = String.format(
                     "%02d:%02d:%02d",
@@ -88,7 +91,7 @@ class TimerViewModel : ViewModel() {
 
                 val remainingSeconds: Double = millisUntilFinished.toDouble() / 1000
                 Log.d("TIMER", "remainingSeconds $remainingSeconds")
-                val currentProgress: Double = remainingSeconds/(timerTimeInMillis / 1000)
+                val currentProgress: Double = remainingSeconds / (timerTimeInMillis / 1000)
                 timerProgress.value = currentProgress
             }
             override fun onFinish() {
@@ -99,11 +102,10 @@ class TimerViewModel : ViewModel() {
         }.start()
     }
 
-    fun endTimer(){
+    fun endTimer() {
         isRunning.value = false
         timer?.cancel()
     }
-
 }
 
 @Composable
@@ -120,7 +122,6 @@ fun Progress(value: Double, displayTime: String) {
 
         Text(text = displayTime)
     }
-
 }
 
 // Start building your app here!
@@ -131,9 +132,9 @@ fun MyApp(viewModel: TimerViewModel) {
     val timerProgress: Double by viewModel.timerProgress.observeAsState(1.0)
     val timerDisplayProgress: String by viewModel.timerDisplayProgress.observeAsState("")
 
-    val hour = remember { mutableStateOf("0")}
-    val minute = remember { mutableStateOf("0")}
-    val second = remember { mutableStateOf("0")}
+    val hour = remember { mutableStateOf("0") }
+    val minute = remember { mutableStateOf("0") }
+    val second = remember { mutableStateOf("0") }
 
     Surface(
         color = MaterialTheme.colors.background,
@@ -188,18 +189,18 @@ fun MyApp(viewModel: TimerViewModel) {
                 onClick = {
                     val totalTime: Long = (second.value.toLong() * 1000) + (minute.value.toLong() * 60000) + (hour.value.toLong() * 3600000)
 
-                    if(!isRunning){
+                    if (!isRunning) {
                         Log.d("TIMER", "timer should start")
                         viewModel.startTimer(totalTime)
-                    }else{
+                    } else {
                         viewModel.endTimer()
                         Log.d("TIMER", "timer should finish/cancel")
                     }
                 }
             ) {
-                if(isRunning){
+                if (isRunning) {
                     Text("Stop")
-                }else{
+                } else {
                     Text("Start")
                 }
             }
@@ -214,7 +215,6 @@ fun MyApp(viewModel: TimerViewModel) {
                 Progress(timerProgress, timerDisplayProgress)
             }
         }
-
     }
 }
 
