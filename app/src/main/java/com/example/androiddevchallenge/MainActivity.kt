@@ -17,12 +17,14 @@ package com.example.androiddevchallenge
 
 import android.os.Bundle
 import android.os.CountDownTimer
+import android.util.Log
 import androidx.activity.compose.setContent
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -30,7 +32,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
-import androidx.compose.animation.core.tween
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.OutlinedTextField
@@ -39,12 +41,16 @@ import androidx.compose.material.Text
 import androidx.compose.material.Button
 import androidx.compose.material.CircularProgressIndicator
 import androidx.compose.runtime.*
+import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.MutableLiveData
+import androidx.lifecycle.ViewModel
 import com.example.androiddevchallenge.ui.theme.MyTheme
+import java.util.concurrent.TimeUnit
 
 @ExperimentalAnimationApi
 class MainActivity : AppCompatActivity() {
@@ -52,29 +58,78 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             MyTheme {
-                MyApp()
+                MyApp(TimerViewModel())
             }
         }
     }
 }
 
+class TimerViewModel : ViewModel() {
+    val timerDisplayProgress =  MutableLiveData("")
+    val timerProgress = MutableLiveData(1.0)
+    val isRunning = MutableLiveData(false)
+    var timer: CountDownTimer? = null
+
+    fun startTimer(timerTimeInMillis: Long){
+        isRunning.value = true
+        timer = object: CountDownTimer(timerTimeInMillis, 1000){
+            override fun onTick(millisUntilFinished: Long) {
+                val display = String.format(
+                    "%02d:%02d:%02d",
+                    TimeUnit.MILLISECONDS.toHours(millisUntilFinished),
+                    TimeUnit.MILLISECONDS.toMinutes(millisUntilFinished) - TimeUnit.HOURS.toMinutes(
+                        TimeUnit.MILLISECONDS.toHours(millisUntilFinished)
+                    ),
+                    TimeUnit.MILLISECONDS.toSeconds(millisUntilFinished) - TimeUnit.MINUTES.toSeconds(
+                        TimeUnit.MILLISECONDS.toMinutes(millisUntilFinished)
+                    )
+                )
+                timerDisplayProgress.value = display
+
+                val remainingSeconds: Double = millisUntilFinished.toDouble() / 1000
+                Log.d("TIMER", "remainingSeconds $remainingSeconds")
+                val currentProgress: Double = remainingSeconds/(timerTimeInMillis / 1000)
+                timerProgress.value = currentProgress
+            }
+            override fun onFinish() {
+                isRunning.value = false
+                timerProgress.value = 1.0
+                timerDisplayProgress.value = ""
+            }
+        }.start()
+    }
+
+    fun endTimer(){
+        isRunning.value = false
+        timer?.cancel()
+    }
+
+}
+
 @Composable
-fun Progress(value: Double) {
-    CircularProgressIndicator(
-        progress = value.toFloat(),
-        modifier = Modifier
-            .width(200.dp)
-            .height(200.dp)
-    )
+fun Progress(value: Double, displayTime: String) {
+    Box(
+        contentAlignment = Alignment.Center
+    ) {
+        CircularProgressIndicator(
+            progress = value.toFloat(),
+            modifier = Modifier
+                .width(200.dp)
+                .height(200.dp)
+        )
+
+        Text(text = displayTime)
+    }
+
 }
 
 // Start building your app here!
 @ExperimentalAnimationApi
 @Composable
-fun MyApp() {
-    val isRunning = remember { mutableStateOf(false) }
-    val timerProgress = remember { mutableStateOf(1.0) }
-    val timerTimeInMillis = remember { mutableStateOf(0L) }
+fun MyApp(viewModel: TimerViewModel) {
+    val isRunning: Boolean by viewModel.isRunning.observeAsState(false)
+    val timerProgress: Double by viewModel.timerProgress.observeAsState(1.0)
+    val timerDisplayProgress: String by viewModel.timerDisplayProgress.observeAsState("")
 
     val hour = remember { mutableStateOf("0")}
     val minute = remember { mutableStateOf("0")}
@@ -132,31 +187,17 @@ fun MyApp() {
                 modifier = Modifier.fillMaxWidth(),
                 onClick = {
                     val totalTime: Long = (second.value.toLong() * 1000) + (minute.value.toLong() * 60000) + (hour.value.toLong() * 3600000)
-                    timerTimeInMillis.value = totalTime
 
-                    val timer = object: CountDownTimer(timerTimeInMillis.value, 1000){
-                        override fun onTick(millisUntilFinished: Long) {
-                            val remainingSeconds: Double = millisUntilFinished.toDouble() / 1000
-                            val currentProgress: Double = remainingSeconds/(timerTimeInMillis.value / 1000)
-                            timerProgress.value = currentProgress
-                        }
-                        override fun onFinish() {
-                            isRunning.value = false
-                        }
-                    }
-
-                    isRunning.value = !isRunning.value
-                    if(isRunning.value){
-                        timer.start()
+                    if(!isRunning){
+                        Log.d("TIMER", "timer should start")
+                        viewModel.startTimer(totalTime)
                     }else{
-                        timerTimeInMillis.value = 0L
-                        timerProgress.value = 1.0
-                        timer.onFinish()
-                        timer.cancel()
+                        viewModel.endTimer()
+                        Log.d("TIMER", "timer should finish/cancel")
                     }
                 }
             ) {
-                if(isRunning.value){
+                if(isRunning){
                     Text("Stop")
                 }else{
                     Text("Start")
@@ -166,11 +207,11 @@ fun MyApp() {
             Spacer(Modifier.height(18.dp))
 
             AnimatedVisibility(
-                visible = isRunning.value,
+                visible = isRunning,
                 enter = fadeIn(initialAlpha = 0.3f),
                 exit = fadeOut(animationSpec = tween(durationMillis = 500))
             ) {
-                Progress(timerProgress.value)
+                Progress(timerProgress, timerDisplayProgress)
             }
         }
 
@@ -182,7 +223,7 @@ fun MyApp() {
 @Composable
 fun LightPreview() {
     MyTheme {
-        MyApp()
+        MyApp(TimerViewModel())
     }
 }
 
@@ -191,6 +232,6 @@ fun LightPreview() {
 @Composable
 fun DarkPreview() {
     MyTheme(darkTheme = true) {
-        MyApp()
+        MyApp(TimerViewModel())
     }
 }
